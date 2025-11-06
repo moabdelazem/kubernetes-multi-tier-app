@@ -1,0 +1,31 @@
+services:
+  postgres_dev_database:
+    image: postgres:16-alpine
+    container_name: k8s_app_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: devuser
+      POSTGRES_PASSWORD: devpassword
+      POSTGRES_DB: k8s_app_dev
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./init-scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devuser -d k8s_app_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - k8s_app_network
+
+volumes:
+  postgres_dev_data:
+    driver: local
+
+networks:
+  k8s_app_network:
+    driver: bridge

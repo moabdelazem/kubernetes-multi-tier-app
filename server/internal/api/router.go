@@ -1,16 +1,19 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/moabdelazem/k8s-app/internal/api/handlers"
+	"github.com/moabdelazem/k8s-app/internal/repository"
+	"github.com/moabdelazem/k8s-app/internal/service"
 	"github.com/moabdelazem/k8s-app/pkg/logger"
 	"go.uber.org/zap"
 )
 
-func SetupRoutes() *chi.Mux {
+func SetupRoutes(db *sql.DB) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middlewares
@@ -18,11 +21,27 @@ func SetupRoutes() *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(LoggingMiddleware)
 
+	// Health endpoints
 	r.Get("/health", handlers.Health)
-
-	// Liveness and Readiness Probes For Kubernetes
 	r.Get("/live", handlers.LivenessProbe)
 	r.Get("/ready", handlers.ReadinessProbe)
+
+	// Initialize poll dependencies
+	pollRepo := repository.NewPollRepository(db)
+	pollService := service.NewPollService(pollRepo)
+	pollHandler := handlers.NewPollHandler(pollService)
+
+	// API v1 routes
+	r.Route("/api/v1", func(r chi.Router) {
+		// Poll routes
+		r.Route("/polls", func(r chi.Router) {
+			r.Post("/", pollHandler.CreatePoll)          // Create poll
+			r.Get("/", pollHandler.ListPolls)            // List polls
+			r.Get("/{id}", pollHandler.GetPoll)          // Get poll with results
+			r.Post("/{id}/vote", pollHandler.VoteOnPoll) // Vote on poll
+			r.Delete("/{id}", pollHandler.DeletePoll)    // Delete poll
+		})
+	})
 
 	return r
 }

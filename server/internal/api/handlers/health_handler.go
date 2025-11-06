@@ -5,7 +5,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/moabdelazem/k8s-app/internal/database"
+	"github.com/moabdelazem/k8s-app/pkg/logger"
 	"github.com/moabdelazem/k8s-app/pkg/response"
+	"go.uber.org/zap"
 )
 
 var startTime = time.Now()
@@ -17,6 +20,7 @@ type HealthResponse struct {
 	Uptime    string            `json:"uptime"`
 	Version   string            `json:"version"`
 	System    SystemInfo        `json:"system"`
+	Database  *DatabaseInfo     `json:"database,omitempty"`
 	Checks    map[string]string `json:"checks,omitempty"`
 }
 
@@ -25,6 +29,18 @@ type SystemInfo struct {
 	GoVersion    string `json:"go_version"`
 	NumCPU       int    `json:"num_cpu"`
 	NumGoroutine int    `json:"num_goroutine"`
+}
+
+// DatabaseInfo contains database connection pool information
+type DatabaseInfo struct {
+	Status            string `json:"status"`
+	OpenConnections   int    `json:"open_connections"`
+	InUse             int    `json:"in_use"`
+	Idle              int    `json:"idle"`
+	WaitCount         int64  `json:"wait_count"`
+	WaitDuration      string `json:"wait_duration"`
+	MaxIdleClosed     int64  `json:"max_idle_closed"`
+	MaxLifetimeClosed int64  `json:"max_lifetime_closed"`
 }
 
 // Health handles the health check endpoint
@@ -43,6 +59,28 @@ func Health(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
+	// Add database health information
+	if err := database.Ping(); err != nil {
+		healthData.Database = &DatabaseInfo{
+			Status: "unhealthy",
+		}
+		logger.Warn("Database health check failed in /health endpoint",
+			zap.Error(err),
+		)
+	} else {
+		stats := database.Stats()
+		healthData.Database = &DatabaseInfo{
+			Status:            "healthy",
+			OpenConnections:   stats.OpenConnections,
+			InUse:             stats.InUse,
+			Idle:              stats.Idle,
+			WaitCount:         stats.WaitCount,
+			WaitDuration:      stats.WaitDuration.String(),
+			MaxIdleClosed:     stats.MaxIdleClosed,
+			MaxLifetimeClosed: stats.MaxLifetimeClosed,
+		}
+	}
+
 	response.Success(w, "", healthData)
 }
 
@@ -59,15 +97,25 @@ func ReadinessProbe(w http.ResponseWriter, r *http.Request) {
 	checks := make(map[string]string)
 	isReady := true
 
-	// TODO: Database check
-	// if err := db.Ping(); err != nil {
-	//     checks["database"] = "unhealthy"
-	//     isReady = false
-	// } else {
-	//     checks["database"] = "healthy"
-	// }
+	// Database health check
+	if err := database.Ping(); err != nil {
+		checks["database"] = "unhealthy"
+		isReady = false
+		logger.Error("Database health check failed",
+			zap.Error(err),
+		)
+	} else {
+		checks["database"] = "healthy"
 
-	// For now, just return ready
+		// Add connection pool stats
+		stats := database.Stats()
+		logger.Debug("Database connection pool stats",
+			zap.Int("open_connections", stats.OpenConnections),
+			zap.Int("in_use", stats.InUse),
+			zap.Int("idle", stats.Idle),
+		)
+	}
+
 	checks["api"] = "ready"
 
 	if !isReady {
