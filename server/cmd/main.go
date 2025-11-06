@@ -1,22 +1,37 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
 	"github.com/moabdelazem/k8s-app/internal/api"
 	"github.com/moabdelazem/k8s-app/internal/config"
+	"github.com/moabdelazem/k8s-app/pkg/logger"
+	"go.uber.org/zap"
 )
 
 func main() {
+	// Initialize configuration
 	cfg, err := config.NewConfig()
 	if err != nil {
-		log.Fatalf("Invalid configuration: %v", err)
+		logger.Fatal("Failed to load configuration", zap.Error(err))
 	}
 
+	// Initialize logger
+	if err := logger.Init(cfg.Env); err != nil {
+		logger.Fatal("Failed to initialize logger", zap.Error(err))
+	}
+	defer logger.Sync()
+
+	// Setup routes
 	router := api.SetupRoutes()
-	log.Printf("Start on %v Environment: %s", cfg.Addr, cfg.Env)
+
+	// Start server
+	logger.Info("Starting server",
+		zap.String("address", cfg.Addr),
+		zap.String("environment", cfg.Env),
+	)
+
 	if err := http.ListenAndServe(cfg.Addr, router); err != nil {
-		log.Fatalf("Something wrong happend %v", err)
+		logger.Fatal("Server failed to start", zap.Error(err))
 	}
 }
