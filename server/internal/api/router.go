@@ -5,8 +5,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/moabdelazem/k8s-app/internal/api/handlers"
 	"github.com/moabdelazem/k8s-app/pkg/logger"
-	"github.com/moabdelazem/k8s-app/pkg/response"
 	"go.uber.org/zap"
 )
 
@@ -18,11 +18,11 @@ func SetupRoutes() *chi.Mux {
 	r.Use(middleware.Recoverer)
 	r.Use(LoggingMiddleware)
 
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		response.Success(w, "", map[string]string{
-			"status": "somehow still alive",
-		})
-	})
+	r.Get("/health", handlers.Health)
+
+	// Liveness and Readiness Probes For Kubernetes
+	r.Get("/live", handlers.LivenessProbe)
+	r.Get("/ready", handlers.ReadinessProbe)
 
 	return r
 }
