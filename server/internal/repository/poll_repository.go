@@ -9,6 +9,18 @@ import (
 	"github.com/moabdelazem/k8s-app/internal/models"
 )
 
+// PollRepositoryInterface defines the contract for poll data access
+type PollRepositoryInterface interface {
+	CreatePoll(ctx context.Context, poll *models.Poll, options []models.PollOption) error
+	GetPollByID(ctx context.Context, id uuid.UUID) (*models.Poll, error)
+	GetPollOptions(ctx context.Context, pollID uuid.UUID) ([]models.PollOption, error)
+	ListPolls(ctx context.Context, limit, offset int, activeOnly bool) ([]models.Poll, error)
+	CastVote(ctx context.Context, vote *models.Vote) error
+	HasVoted(ctx context.Context, pollID uuid.UUID, voterIdentifier string) (bool, *uuid.UUID, error)
+	DeletePoll(ctx context.Context, id uuid.UUID) error
+	GetTotalPollsCount(ctx context.Context, activeOnly bool) (int64, error)
+}
+
 type PollRepository struct {
 	db *sql.DB
 }

@@ -13,10 +13,10 @@ import (
 )
 
 type PollService struct {
-	repo *repository.PollRepository
+	repo repository.PollRepositoryInterface
 }
 
-func NewPollService(repo *repository.PollRepository) *PollService {
+func NewPollService(repo repository.PollRepositoryInterface) *PollService {
 	return &PollService{repo: repo}
 }
 
