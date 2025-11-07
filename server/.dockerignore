@@ -1,0 +1,55 @@
+# Build output
+bin/
+*.exe
+*.out
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+.github
+
+# Docker
+Dockerfile
+docker-compose.yml
+compose.dev.yaml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Testing
+*_test.go
+coverage.out
+coverage.html
+.nyc_output
+
+# Development
+init-scripts/
+Makefile
+
+# Temporary files
+*.log
+.cache
+.temp
+tmp/
+
+# Go specific
+vendor/

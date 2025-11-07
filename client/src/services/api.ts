@@ -5,7 +5,8 @@ import type {
   PaginatedResponse,
 } from "@/types/poll";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:6767";
+const API_BASE =
+  import.meta.env.VITE_API_BASE || "http://localhost:6767/api/v1";
 
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
