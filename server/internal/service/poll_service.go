@@ -201,8 +201,8 @@ func (s *PollService) CastVote(ctx context.Context, pollID uuid.UUID, optionID u
 	return nil
 }
 
-// ListPolls lists polls with pagination
-func (s *PollService) ListPolls(ctx context.Context, limit, offset int, activeOnly bool) ([]models.Poll, int64, error) {
+// ListPolls lists polls with pagination and includes options
+func (s *PollService) ListPolls(ctx context.Context, limit, offset int, activeOnly bool) ([]models.PollWithOptions, int64, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 20 // Default limit
 	}
@@ -210,7 +210,7 @@ func (s *PollService) ListPolls(ctx context.Context, limit, offset int, activeOn
 		offset = 0
 	}
 
-	polls, err := s.repo.ListPolls(ctx, limit, offset, activeOnly)
+	polls, err := s.repo.ListPollsWithOptions(ctx, limit, offset, activeOnly)
 	if err != nil {
 		return nil, 0, fmt.Errorf("failed to list polls: %w", err)
 	}

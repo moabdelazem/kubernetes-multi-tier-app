@@ -51,8 +51,8 @@ func main() {
 		zap.Duration("retry_delay", cfg.DB.RetryDelay),
 	)
 
-	// Setup routes with database
-	router := api.SetupRoutes(database.GetDB())
+	// Setup routes with database and config
+	router := api.SetupRoutes(database.GetDB(), cfg)
 
 	// Start server
 	logger.Info("Starting server",

@@ -15,6 +15,7 @@ type PollRepositoryInterface interface {
 	GetPollByID(ctx context.Context, id uuid.UUID) (*models.Poll, error)
 	GetPollOptions(ctx context.Context, pollID uuid.UUID) ([]models.PollOption, error)
 	ListPolls(ctx context.Context, limit, offset int, activeOnly bool) ([]models.Poll, error)
+	ListPollsWithOptions(ctx context.Context, limit, offset int, activeOnly bool) ([]models.PollWithOptions, error)
 	CastVote(ctx context.Context, vote *models.Vote) error
 	HasVoted(ctx context.Context, pollID uuid.UUID, voterIdentifier string) (bool, *uuid.UUID, error)
 	DeletePoll(ctx context.Context, id uuid.UUID) error
@@ -174,6 +175,95 @@ func (r *PollRepository) ListPolls(ctx context.Context, limit, offset int, activ
 	}
 
 	return polls, rows.Err()
+}
+
+// ListPollsWithOptions retrieves polls with their options in a single query (optimized)
+func (r *PollRepository) ListPollsWithOptions(ctx context.Context, limit, offset int, activeOnly bool) ([]models.PollWithOptions, error) {
+	// Query to get polls with their options using a LEFT JOIN
+	query := `
+		SELECT 
+			p.id, p.question, p.description, p.created_at, p.expires_at, p.is_active, p.total_votes,
+			po.id, po.poll_id, po.option_text, po.vote_count, po.position, po.created_at
+		FROM polls p
+		LEFT JOIN poll_options po ON p.id = po.poll_id
+		WHERE ($1 = false OR (p.is_active = true AND (p.expires_at IS NULL OR p.expires_at > NOW())))
+		ORDER BY p.created_at DESC, po.position ASC
+		LIMIT $2 OFFSET $3`
+
+	rows, err := r.db.QueryContext(ctx, query, activeOnly, limit, offset)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query polls with options: %w", err)
+	}
+	defer rows.Close()
+
+	// Map to group options by poll ID
+	pollsMap := make(map[uuid.UUID]*models.PollWithOptions)
+	var pollIDs []uuid.UUID // To maintain order
+
+	for rows.Next() {
+		var poll models.Poll
+		var option models.PollOption
+		var optionID, optionPollID sql.NullString
+		var optionText sql.NullString
+		var optionVoteCount sql.NullInt64
+		var optionPosition sql.NullInt32
+		var optionCreatedAt sql.NullTime
+
+		err := rows.Scan(
+			&poll.ID,
+			&poll.Question,
+			&poll.Description,
+			&poll.CreatedAt,
+			&poll.ExpiresAt,
+			&poll.IsActive,
+			&poll.TotalVotes,
+			&optionID,
+			&optionPollID,
+			&optionText,
+			&optionVoteCount,
+			&optionPosition,
+			&optionCreatedAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan poll with options: %w", err)
+		}
+
+		// Check if poll exists in map
+		if _, exists := pollsMap[poll.ID]; !exists {
+			pollsMap[poll.ID] = &models.PollWithOptions{
+				Poll:    poll,
+				Options: []models.PollOption{},
+			}
+			pollIDs = append(pollIDs, poll.ID)
+		}
+
+		// Add option if it exists (LEFT JOIN may return NULL for polls without options)
+		if optionID.Valid {
+			optionUUID, _ := uuid.Parse(optionID.String)
+			pollUUID, _ := uuid.Parse(optionPollID.String)
+
+			option.ID = optionUUID
+			option.PollID = pollUUID
+			option.OptionText = optionText.String
+			option.VoteCount = optionVoteCount.Int64
+			option.Position = int(optionPosition.Int32)
+			option.CreatedAt = optionCreatedAt.Time
+
+			pollsMap[poll.ID].Options = append(pollsMap[poll.ID].Options, option)
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// Convert map to slice maintaining order
+	var result []models.PollWithOptions
+	for _, pollID := range pollIDs {
+		result = append(result, *pollsMap[pollID])
+	}
+
+	return result, nil
 }
 
 // CastVote records a vote for an option

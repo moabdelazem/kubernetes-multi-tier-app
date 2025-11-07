@@ -6,15 +6,32 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	"github.com/moabdelazem/k8s-app/internal/api/handlers"
+	"github.com/moabdelazem/k8s-app/internal/config"
 	"github.com/moabdelazem/k8s-app/internal/repository"
 	"github.com/moabdelazem/k8s-app/internal/service"
 	"github.com/moabdelazem/k8s-app/pkg/logger"
 	"go.uber.org/zap"
 )
 
-func SetupRoutes(db *sql.DB) *chi.Mux {
+func SetupRoutes(db *sql.DB, cfg *config.Config) *chi.Mux {
 	r := chi.NewRouter()
+
+	// CORS middleware - configured from environment variables
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins:   cfg.CORS.AllowedOrigins,
+		AllowedMethods:   cfg.CORS.AllowedMethods,
+		AllowedHeaders:   cfg.CORS.AllowedHeaders,
+		ExposedHeaders:   cfg.CORS.ExposedHeaders,
+		AllowCredentials: cfg.CORS.AllowCredentials,
+		MaxAge:           cfg.CORS.MaxAge,
+	}))
+
+	logger.Info("CORS configured",
+		zap.Strings("allowed_origins", cfg.CORS.AllowedOrigins),
+		zap.Bool("allow_credentials", cfg.CORS.AllowCredentials),
+	)
 
 	// Middlewares
 	r.Use(middleware.RequestID)

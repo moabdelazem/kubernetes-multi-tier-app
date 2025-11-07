@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -14,6 +15,7 @@ type Config struct {
 	Addr string `json:"addr"`
 	Env  string `json:"env"`
 	DB   DBConfig
+	CORS CORSConfig
 }
 
 type DBConfig struct {
@@ -30,6 +32,15 @@ type DBConfig struct {
 	RetryDelay      time.Duration
 }
 
+type CORSConfig struct {
+	AllowedOrigins   []string
+	AllowedMethods   []string
+	AllowedHeaders   []string
+	ExposedHeaders   []string
+	AllowCredentials bool
+	MaxAge           int
+}
+
 func NewConfig() (*Config, error) {
 	godotenv.Load()
 
@@ -41,6 +52,14 @@ func NewConfig() (*Config, error) {
 	// Parse retry settings
 	maxRetries, _ := strconv.Atoi(env.GetEnv("DB_MAX_RETRIES", "5"))
 	retryDelay, _ := time.ParseDuration(env.GetEnv("DB_RETRY_DELAY", "2s"))
+
+	// Parse CORS settings
+	allowedOrigins := strings.Split(env.GetEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000"), ",")
+	allowedMethods := strings.Split(env.GetEnv("CORS_ALLOWED_METHODS", "GET,POST,PUT,DELETE,OPTIONS"), ",")
+	allowedHeaders := strings.Split(env.GetEnv("CORS_ALLOWED_HEADERS", "Accept,Authorization,Content-Type,X-CSRF-Token"), ",")
+	exposedHeaders := strings.Split(env.GetEnv("CORS_EXPOSED_HEADERS", "Link"), ",")
+	allowCredentials, _ := strconv.ParseBool(env.GetEnv("CORS_ALLOW_CREDENTIALS", "true"))
+	corsMaxAge, _ := strconv.Atoi(env.GetEnv("CORS_MAX_AGE", "300"))
 
 	cfg := &Config{
 		Addr: fmt.Sprintf(":%s", env.GetEnv("PORT", "8080")),
@@ -57,6 +76,14 @@ func NewConfig() (*Config, error) {
 			ConnMaxLifetime: connMaxLifetime,
 			MaxRetries:      maxRetries,
 			RetryDelay:      retryDelay,
+		},
+		CORS: CORSConfig{
+			AllowedOrigins:   allowedOrigins,
+			AllowedMethods:   allowedMethods,
+			AllowedHeaders:   allowedHeaders,
+			ExposedHeaders:   exposedHeaders,
+			AllowCredentials: allowCredentials,
+			MaxAge:           corsMaxAge,
 		},
 	}
 
